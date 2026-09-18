@@ -34,7 +34,7 @@ impl GraphClient {
     pub fn new(auth: Arc<Authenticator>) -> Self {
         Self {
             http: reqwest::Client::builder()
-                .user_agent("m365-tui/0.1")
+                .user_agent(concat!("ask-ark/", env!("CARGO_PKG_VERSION")))
                 .build()
                 .expect("building reqwest client"),
             auth,

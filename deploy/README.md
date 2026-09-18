@@ -1,8 +1,7 @@
-# m365-tui — real-time stack
+# ask-ark — real-time stack
 
-This folder is everything needed to give **instant push** to
-[m365-tui](https://github.com/rootHytx/m365-tui). It ships inside the release
-tarball, so if you have the app you already have this.
+This folder is everything needed to give **instant push** to Ask Ark. It ships
+inside the Linux release tarball, so if you have the app you already have this.
 
 It's entirely optional. The app works fully without it, refreshing every 20
 seconds; this gets you ~1 second.
@@ -45,7 +44,7 @@ M365_TUNNEL_BASE_URL=https://something-random-here.trycloudflare.com
 M365_CLIENT_STATE=1f4c…
 ```
 
-Then launch `m365` — the top-right corner should read **`push live`**.
+Then launch `ark` — the top-right corner should read **`push live`**.
 
 Stop it with `./down.sh`. The app keeps working, just back on the 20-second
 refresh.
@@ -87,7 +86,7 @@ For a hostname that stays put:
 | `docker-compose.yml` | The three services, with the two tunnel flavours as profiles |
 | `Dockerfile` | Wraps the prebuilt `m365-webhook` in Alpine — builds in about a second |
 | `.env.example` | Documented settings; `up.sh` copies it to `.env` |
-| `m365-webhook` | The webhook binary, static, from the same release as `m365` |
+| `m365-webhook` | The webhook binary, static, from the same release as `ark` |
 
 Its `.env` is **separate from the app's** — this one configures the containers,
 the app's configures the app. `up.sh` prints the two values that have to cross

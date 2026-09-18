@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "Shared engine for the M365 TUI: auth, Microsoft Graph client, models, subscriptions, event bus."
+description = "Shared Microsoft Graph engine for Ask Ark: auth, models, subscriptions, and event bus."
 
 [dependencies]
 tokio.workspace = true

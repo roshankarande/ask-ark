@@ -486,7 +486,9 @@ impl App {
     /// Kick off the initial data loads.
     pub fn bootstrap(&mut self) {
         self.load_whoami();
-        self.load_presence();
+        if self.session.config.can_read_presence() {
+            self.load_presence();
+        }
         self.load_folders();
         self.load_chats();
     }

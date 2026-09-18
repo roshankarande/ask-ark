@@ -1,4 +1,4 @@
-# m365-tui
+# Ask Ark
 
 A terminal client for **Outlook and Microsoft Teams**, in one app. Switch
 between the two with `F2`.
@@ -26,7 +26,7 @@ Built on the Microsoft Graph API in Rust. For how it works internally, see
 |---|---|
 | **A work or school Microsoft 365 account** | Personal accounts can't use the Teams messaging APIs |
 | **An Entra app registration** | See [step 1](#1-register-an-app-in-entra) — you need a client ID |
-| **Linux on x86_64 or aarch64** | The release binaries are statically linked against musl: no libc, no shared libraries, runs on any distribution including NixOS |
+| **Linux or Windows on x64 or ARM64** | Four native release builds are published. Linux binaries are statically linked and run on distributions including NixOS |
 
 Nothing else. The binary has no runtime library dependencies.
 
@@ -79,7 +79,7 @@ You need an app registration to get a client ID. Sign in at
 [entra.microsoft.com](https://entra.microsoft.com) → *Applications* →
 *App registrations* → **New registration**.
 
-1. **Name**: anything, e.g. `m365-tui`.
+1. **Name**: anything, e.g. `ask-ark`.
 2. **Supported account types**: *Accounts in this organizational directory only*.
 3. **Redirect URI**: leave blank.
 4. Click **Register**, then copy the **Application (client) ID** and
@@ -138,26 +138,33 @@ just polling instead of instant push.
 
 ## 3. Install
 
-**One download, nothing else required:**
+Download the archive for your system from the GitHub Releases page:
+
+| System | x64 | ARM64 |
+|---|---|---|
+| Linux | `ask-ark-x86_64-linux-musl.tar.gz` | `ask-ark-aarch64-linux-musl.tar.gz` |
+| Windows | `ask-ark-x86_64-windows.zip` | `ask-ark-aarch64-windows.zip` |
+
+Linux installation:
 
 ```sh
-curl -fsSL -o m365-tui.tar.gz \
-  "https://github.com/rootHytx/m365-tui/releases/latest/download/m365-tui-$(uname -m)-linux-musl.tar.gz"
-tar xzf m365-tui.tar.gz
-sudo install m365-tui-*/m365 /usr/local/bin/
+tar xzf ask-ark-*-linux-musl.tar.gz
+sudo install ask-ark-*/ark /usr/local/bin/
 ```
 
-`uname -m` picks the right build — `x86_64` and `aarch64` are both published, one
-tarball each. That's the whole release; there's nothing else to fetch.
+On Windows, extract the ZIP and put `ark.exe` somewhere on your `PATH`.
 
-Inside you get:
+The Linux archive contains:
 
 | | |
 |---|---|
-| `m365` | **the app** — this is the one you install |
+| `ark` | **the app** — this is the one you install |
 | `realtime/` | optional add-on for [instant push](#instant-push-optional); ignore it unless you want that |
 | `m365-webhook` | used by `realtime/`; you never run it directly |
-| `README.md` `ARCHITECTURE.md` `LICENSE` | the docs you're reading |
+| `.env.example` | configuration template |
+| `README.md` `ARCHITECTURE.md` `LICENSE` | documentation and license |
+
+The Windows archive contains `ark.exe`, `.env.example`, and the documentation.
 
 Each release also publishes a `.sha256` next to the tarball if you want to
 verify it.
@@ -165,18 +172,16 @@ verify it.
 <details>
 <summary>Other ways to install</summary>
 
-**Nix** — run it without installing, or add it to a system/home-manager flake
-(`m365-tui.packages.${system}.default`):
+**Nix** — from a source checkout:
 
 ```sh
-nix run github:rootHytx/m365-tui
-nix profile install github:rootHytx/m365-tui
+nix run
 ```
 
 **From source** — needs a Rust toolchain:
 
 ```sh
-cargo build --release            # binary at target/release/m365
+cargo build --release            # binary at target/release/ark
 nix develop -c cargo build --release    # or via the bundled dev shell
 ```
 
@@ -185,14 +190,27 @@ nix develop -c cargo build --release    # or via the bundled dev shell
 ## 4. Run
 
 ```sh
-m365 --help     # usage; needs no configuration
-m365 whoami     # sign in and print your identity — a good first check
-m365            # launch
+ark --help     # usage; needs no configuration
+ark whoami     # sign in and print your identity — a good first check
+ark            # launch
 ```
 
 The first run prints a URL and a code: open the URL, enter the code, sign in.
-The token is cached at `~/.config/m365-tui/token-cache.json` and refreshed
+The token is cached at `~/.config/ask-ark/token-cache.json` and refreshed
 automatically, so you only do this once.
+
+Use a different token cache with an absolute path:
+
+```sh
+ark --json-path /absolute/path/token-cache.json
+```
+
+By default `ark` reads environment variables and an optional `.env` in the
+current directory. To load a specific file instead:
+
+```sh
+ark --env-path /absolute/path/.env
+```
 
 ---
 
@@ -298,7 +316,7 @@ port.
 downloaded in [step 3](#3-install). Nothing more to fetch:
 
 ```sh
-cd m365-tui-*/realtime && ./up.sh
+cd ask-ark-*/realtime && ./up.sh
 ```
 
 It checks Docker, generates the shared secret, starts the webhook, Redis and the
@@ -359,7 +377,7 @@ your tunnel hostname — Graph reports `Failed to resolve domain ...`. Check
 **Pressing `t` says channels need a permission.** Listing your teams requires
 `Team.ReadBasic.All`, which isn't requested by default. Add it to the app
 registration, set `M365_TEAMS_CHANNELS=1` in `.env`, delete
-`~/.config/m365-tui/token-cache.json` and sign in again. Chats need none of this.
+`~/.config/ask-ark/token-cache.json` and sign in again. Chats need none of this.
 
 **Sign-in asks for admin approval.** The requested scopes no longer match what
 was consented. Either have an admin approve the new set, or pin the old one with
@@ -367,9 +385,9 @@ was consented. Either have an admin approve the new set, or pin the old one with
 
 **Nothing arrives instantly.** Look at the push indicator in the tab bar — see
 [Is it actually working?](#is-it-actually-working). Subscription errors are also
-recorded in `$TMPDIR/m365-tui.log`.
+recorded in `$TMPDIR/ask-ark.log`.
 
-**Anything else.** Logs go to `$TMPDIR/m365-tui.log`; run with `RUST_LOG=debug`
+**Anything else.** Logs go to `$TMPDIR/ask-ark.log`; run with `RUST_LOG=debug`
 for detail.
 
 ## Development

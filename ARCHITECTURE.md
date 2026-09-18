@@ -1,6 +1,6 @@
 # Architecture
 
-How m365-tui is put together and why. For installing and using it, see the
+How ask-ark is put together and why. For installing and using it, see the
 [README](README.md).
 
 ## Crate layout
@@ -11,7 +11,7 @@ A Cargo workspace with one library and two binaries:
 crates/
   m365-core/   library — auth, Graph client, models, endpoint wrappers,
                subscriptions, and the change-event bus
-  m365-tui/    binary `m365` — the ratatui application
+  m365-tui/    package `ask-ark`, binary `ark` — the ratatui application
   webhook/     binary `m365-webhook` — axum change-notification receiver
 deploy/        the real-time stack, shipped as its own release asset
 ```
@@ -32,7 +32,7 @@ The webhook shares the core only for its event types.
 | `events.rs` | Redis subscriber → typed UI events |
 | `util.rs` | base64, HTML escaping |
 
-### m365-tui
+### ask-ark
 
 | Module | Responsibility |
 |---|---|
@@ -445,33 +445,32 @@ Two places take data from anyone who can send you a message:
 
 ## Releases
 
-Pushing a `v*.*` tag runs `.github/workflows/release.yml`: it builds both
-binaries for `x86_64-unknown-linux-musl` — statically linked, so the artifacts
-have no libc dependency and run on any distribution — checks they really are
-static, and publishes one asset per architecture with a SHA-256 checksum.
+Pushing a `v*.*` tag runs `.github/workflows/release.yml`. It builds `ark` for
+Linux and Windows on x64 and ARM64. Linux uses musl, so those binaries have no
+libc dependency and run on any distribution. Every archive has a SHA-256
+checksum.
 
-**One asset per architecture**, `m365-tui-<arch>-linux-musl.tar.gz`, containing:
+Linux assets are `ask-ark-<arch>-linux-musl.tar.gz` and contain:
 
 ```
-m365                    the application
+ark                    the application
 m365-webhook            used by realtime/, never run directly
 realtime/               the optional push stack (deploy/, plus its own
                         copy of m365-webhook so the docker build context
                         is self-contained)
-README.md ARCHITECTURE.md LICENSE
+.env.example README.md ARCHITECTURE.md LICENSE
 ```
 
 This was briefly two assets — the app, and the push stack separately. That put
 two similarly-named tarballs on the releases page with nothing to distinguish
-them, and picking the wrong one got you a download with no `m365` in it. Shipping
+them, and picking the wrong one got you a download with no `ark` in it. Shipping
 one asset makes the question unanswerable-in-the-wrong-way: the push stack is a
 subdirectory you either enter or ignore. The duplicated webhook binary costs a
 couple of megabytes and buys a Dockerfile that is a plain `COPY`.
 
-`<arch>` is `x86_64` or `aarch64`, built on native runners rather than through a
-cross toolchain, so `musl-tools` supplies a matching `musl-gcc` and nothing has
-to be cross-linked. A matrix job builds and packages each, and a dependent job
-collects both and publishes them in one release.
+Windows assets are `ask-ark-<arch>-windows.zip` and contain `ark.exe` plus the
+documentation. `<arch>` is `x86_64` or `aarch64`. Native runners build all four
+variants, and a dependent job publishes them together.
 
 A separate `ci.yml` runs build, `clippy -D warnings` (with `--all-targets`, so
 test code is linted too), the test suite, `shellcheck` over `deploy/`, and a

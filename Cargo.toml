@@ -10,7 +10,7 @@ members = [
 version = "1.2.0"
 edition = "2021"
 license = "MIT"
-authors = ["rootHytx <up201906931@up.pt>"]
+authors = ["Roshan Karande"]
 
 # Shared dependency versions. Minor versions are pinned so the crate APIs match
 # the code in this repo even as newer releases land in the registry.

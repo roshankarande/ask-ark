@@ -66,6 +66,8 @@ pub struct Config {
     pub redis_url: String,
     /// Path of the on-disk token cache (0600).
     pub token_cache_path: PathBuf,
+    /// Optional external command that refreshes the shared token cache.
+    pub token_refresh_command: Option<String>,
     /// Shared secret echoed in subscription `clientState` and verified by the
     /// webhook. Generated on first run if absent.
     pub client_state: String,
@@ -111,6 +113,9 @@ impl Config {
             Ok(p) if !p.trim().is_empty() => PathBuf::from(p),
             _ => default_cache_dir()?.join("token-cache.json"),
         };
+        let token_refresh_command = std::env::var("M365_TOKEN_REFRESH_COMMAND")
+            .ok()
+            .filter(|s| !s.trim().is_empty());
 
         let client_state = std::env::var("M365_CLIENT_STATE")
             .ok()
@@ -130,6 +135,7 @@ impl Config {
             tunnel_base_url,
             redis_url,
             token_cache_path,
+            token_refresh_command,
             client_state,
             notifications,
         })
@@ -148,6 +154,10 @@ impl Config {
     /// Whether the token we request can set presence.
     pub fn can_write_presence(&self) -> bool {
         self.has_scope(PRESENCE_WRITE_SCOPE)
+    }
+
+    pub fn can_read_presence(&self) -> bool {
+        self.has_scope("Presence.Read.All") || self.can_write_presence()
     }
 
     /// Whether the token we request can enumerate teams and channels.
@@ -210,7 +220,7 @@ fn env_required(key: &str) -> Result<String> {
 }
 
 fn default_cache_dir() -> Result<PathBuf> {
-    let dirs = directories::ProjectDirs::from("dev", "rootHytx", "m365-tui")
+    let dirs = directories::ProjectDirs::from("dev", "AskArk", "ask-ark")
         .context("could not determine a config directory for this platform")?;
     let dir = dirs.config_dir().to_path_buf();
     std::fs::create_dir_all(&dir)
@@ -230,6 +240,7 @@ mod tests {
             tunnel_base_url: tunnel.map(|s| s.to_string()),
             redis_url: "redis://127.0.0.1:6379".into(),
             token_cache_path: PathBuf::from("/tmp/x.json"),
+            token_refresh_command: None,
             client_state: "secret".into(),
             notifications: true,
         }
@@ -239,6 +250,7 @@ mod tests {
     fn builds_endpoints_and_urls() {
         let c = sample(Some("https://m365.example.com"));
         assert_eq!(c.scope_string(), "User.Read Mail.Send");
+        assert!(!c.can_read_presence());
         assert_eq!(
             c.token_endpoint(),
             "https://login.microsoftonline.com/organizations/oauth2/v2.0/token"

@@ -12,8 +12,20 @@ pub fn open_url(url: &str) -> Result<()> {
         anyhow::bail!("refusing to open non-http(s) link");
     }
 
-    const CANDIDATES: &[&str] = &["xdg-open", "open"];
-    for bin in CANDIDATES {
+    #[cfg(windows)]
+    if Command::new("cmd")
+        .args(["/C", "start", "", url])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .is_ok()
+    {
+        return Ok(());
+    }
+
+    #[cfg(not(windows))]
+    for bin in ["xdg-open", "open"] {
         let spawned = Command::new(bin)
             .arg(url)
             .stdin(Stdio::null())
@@ -24,7 +36,7 @@ pub fn open_url(url: &str) -> Result<()> {
             return Ok(());
         }
     }
-    Err(anyhow::anyhow!("no opener found (tried xdg-open, open)"))
+    Err(anyhow::anyhow!("no system URL opener was available"))
         .context("could not launch a browser")
 }
 

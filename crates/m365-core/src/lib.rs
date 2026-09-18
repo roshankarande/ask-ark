@@ -1,4 +1,4 @@
-//! Shared engine for the M365 TUI.
+//! Shared Microsoft Graph engine for Ask Ark.
 //!
 //! [`Session`] bundles configuration, the authenticator, and a ready
 //! [`GraphClient`]. The `mail`, `calendar`, `chats`, `channels`, and `people`
@@ -59,8 +59,11 @@ impl Session {
     where
         F: FnOnce(DeviceCodePrompt),
     {
-        if self.auth.has_credentials().await && self.auth.access_token().await.is_ok() {
-            return Ok(());
+        if self.auth.has_credentials().await {
+            match self.auth.access_token().await {
+                Ok(_) => return Ok(()),
+                Err(error) => tracing::warn!("cached token refresh failed: {error:#}"),
+            }
         }
         self.auth.login(on_prompt).await
     }

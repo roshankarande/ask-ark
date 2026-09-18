@@ -1,5 +1,5 @@
 #!/bin/sh
-# Bring up the m365-tui real-time stack (webhook + Redis + Cloudflare tunnel).
+# Bring up the ask-ark real-time stack (webhook + Redis + Cloudflare tunnel).
 #
 #   ./up.sh            named tunnel if CLOUDFLARE_TUNNEL_TOKEN is set, else quick
 #   ./up.sh --quick    force a throwaway trycloudflare.com tunnel
@@ -54,7 +54,7 @@ docker info >/dev/null 2>&1 \
     || die "the Docker daemon isn't reachable. Start it (\`systemctl --user start docker\`, or Docker Desktop), or add yourself to the \`docker\` group."
 
 [ -f m365-webhook ] || die "m365-webhook is missing from $(pwd).
-It ships in the realtime/ folder of the m365-tui release tarball — re-extract
+It ships in the realtime/ folder of the ask-ark release tarball — re-extract
 that, or build it from a source checkout:
   cargo build --release --target x86_64-unknown-linux-musl -p webhook
   cp target/x86_64-unknown-linux-musl/release/m365-webhook deploy/"
@@ -73,7 +73,7 @@ if command -v file >/dev/null 2>&1; then
     host_arch=$(uname -m)
     if [ -n "$bin_arch" ] && [ "$bin_arch" != "$host_arch" ]; then
         die "this bundle holds a $bin_arch binary but you're on $host_arch.
-Download the m365-tui-$host_arch-linux-musl.tar.gz release instead."
+Download the ask-ark-$host_arch-linux-musl.tar.gz release instead."
     fi
 fi
 
@@ -283,7 +283,7 @@ else
 fi
 say "  M365_CLIENT_STATE=$CLIENT_STATE"
 say ''
-say "${DIM}Then launch m365 — the top-right corner should read 'push live'.${OFF}"
+say "${DIM}Then launch ark — the top-right corner should read 'push live'.${OFF}"
 say "${DIM}Logs: $DC logs -f webhook   ·   Stop: ./down.sh${OFF}"
 if [ "$MODE" = quick ]; then
     say ''

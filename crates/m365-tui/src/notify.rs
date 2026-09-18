@@ -75,7 +75,7 @@ fn body_mentions_name(body_html: &str, my_name: &str) -> bool {
 pub fn send(title: &str, body: &str) {
     let body = summarise(body);
     let spawned = Command::new("notify-send")
-        .args(["--app-name=m365-tui", "--icon=mail-message-new", title, &body])
+        .args(["--app-name=Ask Ark", "--icon=mail-message-new", title, &body])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())

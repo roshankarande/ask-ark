@@ -1,10 +1,12 @@
-//! m365 — a unified terminal client for Outlook and Microsoft Teams.
+//! Ask Ark — a unified terminal client for Outlook and Microsoft Teams.
 //!
 //! Usage:
-//!   m365            launch the TUI
-//!   m365 whoami     print the signed-in user and exit (auth smoke test)
-//!   m365 login      run device-code login and exit
-//!   m365 --help     usage; also --version
+//!   ark            launch the TUI
+//!   ark whoami     print the signed-in user and exit (auth smoke test)
+//!   ark login      run device-code login and exit
+//!   ark --env-path /absolute/path/.env
+//!   ark --json-path /absolute/path/token.json
+//!   ark --help     usage; also --version
 //!
 //! Arguments are resolved before any configuration is read or sign-in is
 //! attempted, so `--help` and `--version` work on a machine that has never been
@@ -23,6 +25,7 @@ mod ui;
 mod wrap;
 
 use std::io::stdout;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use anyhow::{Context, Result};
@@ -55,11 +58,16 @@ enum Command {
     Login,
 }
 
+struct Args {
+    command: Command,
+    env_path: Option<PathBuf>,
+}
+
 const USAGE: &str = "\
-m365 — a terminal client for Outlook and Microsoft Teams
+Ask Ark — a terminal client for Outlook and Microsoft Teams
 
 USAGE:
-    m365 [COMMAND]
+    ark [--env-path PATH] [--json-path PATH] [COMMAND]
 
 COMMANDS:
     (none)      launch the TUI
@@ -67,30 +75,63 @@ COMMANDS:
     whoami      print the signed-in account, then exit
 
 OPTIONS:
+        --env-path PATH
+                     absolute path for configuration (default: .env if present)
+        --json-path PATH
+                     absolute path for the token-cache JSON file
     -h, --help     print this help
-    -V, --version  print the version
+    -V, --version  print the version";
 
-Configuration is read from the environment or a .env file; M365_CLIENT_ID is
-the only required value. See https://github.com/rootHytx/m365-tui for setup.";
+fn parse_args() -> Args {
+    let mut command = None;
+    let mut env_path = None;
+    let mut args = std::env::args().skip(1);
 
-fn parse_args() -> Command {
-    match std::env::args().nth(1).as_deref() {
-        None => Command::Tui,
-        Some("whoami") => Command::WhoAmI,
-        Some("login") => Command::Login,
-        Some("-h") | Some("--help") | Some("help") => {
-            println!("{USAGE}");
-            std::process::exit(0);
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--env-path" => {
+                let Some(path) = args.next() else {
+                    eprintln!("ark: --env-path requires an absolute path");
+                    std::process::exit(2);
+                };
+                if !Path::new(&path).is_absolute() {
+                    eprintln!("ark: --env-path must be absolute");
+                    std::process::exit(2);
+                }
+                env_path = Some(PathBuf::from(path));
+            }
+            "--json-path" => {
+                let Some(path) = args.next() else {
+                    eprintln!("ark: --json-path requires an absolute path");
+                    std::process::exit(2);
+                };
+                if !Path::new(&path).is_absolute() {
+                    eprintln!("ark: --json-path must be absolute");
+                    std::process::exit(2);
+                }
+                std::env::set_var("M365_TOKEN_CACHE", path);
+            }
+            "whoami" if command.is_none() => command = Some(Command::WhoAmI),
+            "login" if command.is_none() => command = Some(Command::Login),
+            "-h" | "--help" | "help" => {
+                println!("{USAGE}");
+                std::process::exit(0);
+            }
+            "-V" | "--version" | "version" => {
+                println!("ark {}", env!("CARGO_PKG_VERSION"));
+                std::process::exit(0);
+            }
+            other => {
+                eprintln!("ark: unrecognised argument '{other}'\n");
+                eprintln!("{USAGE}");
+                std::process::exit(2);
+            }
         }
-        Some("-V") | Some("--version") | Some("version") => {
-            println!("m365 {}", env!("CARGO_PKG_VERSION"));
-            std::process::exit(0);
-        }
-        Some(other) => {
-            eprintln!("m365: unrecognised argument '{other}'\n");
-            eprintln!("{USAGE}");
-            std::process::exit(2);
-        }
+    }
+
+    Args {
+        command: command.unwrap_or(Command::Tui),
+        env_path,
     }
 }
 
@@ -98,9 +139,18 @@ fn parse_args() -> Command {
 async fn main() -> Result<()> {
     // Before anything else: --help and --version must not require configuration,
     // a network, or a signed-in account.
-    let command = parse_args();
+    let args = parse_args();
 
     init_tracing();
+
+    if let Some(env_path) = &args.env_path {
+        if let Err(e) = dotenvy::from_path(env_path) {
+            eprintln!("configuration error: reading {}: {e}", env_path.display());
+            std::process::exit(1);
+        }
+    } else {
+        dotenvy::dotenv().ok();
+    }
 
     let session = match Session::from_env() {
         Ok(s) => s,
@@ -117,7 +167,7 @@ async fn main() -> Result<()> {
         .await
         .context("sign-in failed")?;
 
-    match command {
+    match args.command {
         Command::WhoAmI => {
             let me = session.whoami().await?;
             println!(
@@ -352,7 +402,7 @@ async fn manage_subscriptions(
 /// Log to a file in the cache dir so we never corrupt the TUI on stdout/stderr.
 fn init_tracing() {
     use tracing_subscriber::EnvFilter;
-    let log_path = std::env::temp_dir().join("m365-tui.log");
+    let log_path = std::env::temp_dir().join("ask-ark.log");
     let _ = tracing_subscriber::fmt()
         .with_ansi(false)
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn")))

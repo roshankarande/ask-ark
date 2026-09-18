@@ -1,5 +1,5 @@
 {
-  description = "m365-tui — unified terminal client for Outlook and Microsoft Teams over Microsoft Graph";
+  description = "Ask Ark — unified terminal client for Outlook and Microsoft Teams";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -56,21 +56,21 @@
     in
     {
       packages.${system} = rec {
-        m365 = mkBin {
-          pname = "m365-tui";
-          cratePkg = "m365-tui";
+        ark = mkBin {
+          pname = "ask-ark";
+          cratePkg = "ask-ark";
           description = "Unified TUI for Outlook and Microsoft Teams";
-          mainProgram = "m365";
+          mainProgram = "ark";
         };
 
         m365-webhook = mkBin {
           pname = "m365-webhook";
           cratePkg = "webhook";
-          description = "Microsoft Graph change-notification receiver for m365-tui";
+          description = "Microsoft Graph change-notification receiver for ask-ark";
           mainProgram = "m365-webhook";
         };
 
-        default = m365;
+        default = ark;
       };
 
       # `nix develop` gives a working Rust toolchain (nixpkgs, not the broken

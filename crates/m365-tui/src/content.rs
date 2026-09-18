@@ -472,7 +472,7 @@ mod tests {
             "https://tickets.example.org/scp/tickets.php?id=47398"
         );
         // Ordinary links pass through untouched.
-        let plain = "https://github.com/rootHytx/m365-tui";
+        let plain = "https://example.com/project";
         assert_eq!(unwrap_safelink(plain), plain);
         // A malformed safelink must not panic or lose the original.
         let broken = "https://eur03.safelinks.protection.outlook.com/no-query-here";

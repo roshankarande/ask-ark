@@ -42,6 +42,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "ask-ark"
+version = "1.2.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "crossterm",
+ "directories",
+ "dotenvy",
+ "futures-util",
+ "html5ever",
+ "m365-core",
+ "markup5ever_rcdom",
+ "ratatui",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -871,25 +891,6 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
-]
-
-[[package]]
-name = "m365-tui"
-version = "1.2.0"
-dependencies = [
- "anyhow",
- "chrono",
- "crossterm",
- "directories",
- "futures-util",
- "html5ever",
- "m365-core",
- "markup5ever_rcdom",
- "ratatui",
- "serde_json",
- "tokio",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]

@@ -1,4 +1,4 @@
-# Real-time stack for m365-tui: everything needed to give Graph a public HTTPS
+# Real-time stack for ask-ark: everything needed to give Graph a public HTTPS
 # endpoint to push change notifications to.
 #
 #   redis        message bus between the webhook and the TUI
@@ -17,12 +17,12 @@
 # static `m365-webhook`. If you have the source checked out instead, the repo-root
 # docker-compose.yml does the same thing but builds from source.
 
-name: m365-tui
+name: ask-ark
 
 services:
   redis:
     image: redis:7-alpine
-    container_name: m365-tui-redis
+    container_name: ask-ark-redis
     restart: unless-stopped
     # Pure message bus: nothing here is worth persisting to disk.
     command: ["redis-server", "--save", "", "--appendonly", "no"]
@@ -38,8 +38,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: m365-tui-webhook:local
-    container_name: m365-tui-webhook
+    image: ask-ark-webhook:local
+    container_name: ask-ark-webhook
     restart: unless-stopped
     environment:
       M365_REDIS_URL: "redis://redis:6379"
@@ -61,7 +61,7 @@ services:
   # http://webhook:8080. Survives restarts, so M365_TUNNEL_BASE_URL is stable.
   cloudflared:
     image: cloudflare/cloudflared:latest
-    container_name: m365-tui-tunnel
+    container_name: ask-ark-tunnel
     profiles: ["named"]
     restart: unless-stopped
     # A `${VAR:?...}` guard would be nicer, but Compose interpolates every
@@ -79,7 +79,7 @@ services:
   # time. Fine for trying push out; use the named tunnel for daily use.
   cloudflared-quick:
     image: cloudflare/cloudflared:latest
-    container_name: m365-tui-tunnel-quick
+    container_name: ask-ark-tunnel-quick
     profiles: ["quick"]
     restart: unless-stopped
     command: tunnel --no-autoupdate --url http://webhook:8080

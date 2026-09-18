@@ -9,11 +9,12 @@
 //! interaction.
 
 use std::path::PathBuf;
+use std::process::Stdio;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize};
 use tokio::sync::Mutex;
 
 use crate::config::Config;
@@ -33,6 +34,7 @@ struct CachedToken {
     access_token: String,
     #[serde(default)]
     refresh_token: Option<String>,
+    #[serde(alias = "_expires_at", deserialize_with = "deserialize_datetime")]
     expires_at: DateTime<Utc>,
     #[serde(default)]
     scope: String,
@@ -52,6 +54,7 @@ pub struct Authenticator {
     token_endpoint: String,
     scope: String,
     cache_path: PathBuf,
+    refresh_command: Option<String>,
     state: Mutex<Option<CachedToken>>,
 }
 
@@ -65,6 +68,7 @@ impl Authenticator {
             token_endpoint: config.token_endpoint(),
             scope: config.scope_string(),
             cache_path: config.token_cache_path.clone(),
+            refresh_command: config.token_refresh_command.clone(),
             state: Mutex::new(cached),
         }
     }
@@ -91,10 +95,48 @@ impl Authenticator {
             .clone()
             .ok_or_else(|| anyhow!("access token expired and no refresh token available"))?;
 
-        let refreshed = self.refresh(&refresh).await?;
+        let refreshed = if let Some(command) = &self.refresh_command {
+            self.refresh_externally(command).await?
+        } else {
+            self.refresh(&refresh).await?
+        };
         let token = refreshed.access_token.clone();
-        self.persist(&refreshed);
+        if self.refresh_command.is_none() {
+            self.persist(&refreshed);
+        }
         *guard = Some(refreshed);
+        Ok(token)
+    }
+
+    async fn refresh_externally(&self, command: &str) -> Result<CachedToken> {
+        #[cfg(windows)]
+        let mut process = {
+            let mut process = tokio::process::Command::new("cmd");
+            process.args(["/C", command]);
+            process
+        };
+        #[cfg(not(windows))]
+        let mut process = {
+            let mut process = tokio::process::Command::new("sh");
+            process.args(["-c", command]);
+            process
+        };
+        let status = process
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .await
+            .context("running external token refresh command")?;
+        if !status.success() {
+            anyhow::bail!("external token refresh command failed with {status}");
+        }
+
+        let token = load_cache(&self.cache_path)
+            .ok_or_else(|| anyhow!("external refresh did not write a valid token cache"))?;
+        if !token.is_valid() {
+            anyhow::bail!("external refresh left an expired token cache");
+        }
+        set_owner_only(&self.cache_path)?;
         Ok(token)
     }
 
@@ -274,8 +316,46 @@ impl TokenResponse {
     }
 }
 
+fn deserialize_datetime<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Value {
+        DateTime(DateTime<Utc>),
+        Unix(i64),
+    }
+
+    match Value::deserialize(deserializer)? {
+        Value::DateTime(value) => Ok(value),
+        Value::Unix(value) => DateTime::from_timestamp(value, 0)
+            .ok_or_else(|| de::Error::custom("invalid Unix timestamp")),
+    }
+}
+
 #[derive(Debug, Deserialize)]
 struct TokenError {
     error: String,
     error_description: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_poc_token_cache() {
+        let token: CachedToken = serde_json::from_str(
+            r#"{
+                "access_token": "access",
+                "refresh_token": "refresh",
+                "_expires_at": 2000000000,
+                "scope": "User.Read Mail.ReadWrite"
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(token.expires_at.timestamp(), 2_000_000_000);
+    }
 }

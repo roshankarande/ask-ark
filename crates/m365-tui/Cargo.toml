@@ -1,13 +1,13 @@
 [package]
-name = "m365-tui"
+name = "ask-ark"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "Unified terminal client for Outlook and Microsoft Teams over Microsoft Graph."
+description = "Ask Ark: a unified terminal client for Outlook and Microsoft Teams."
 
 [[bin]]
-name = "m365"
+name = "ark"
 path = "src/main.rs"
 
 [dependencies]
@@ -23,6 +23,7 @@ futures-util.workspace = true
 html5ever = "0.38"
 markup5ever_rcdom = "0.38"
 directories.workspace = true
+dotenvy.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true

@@ -1,18 +1,16 @@
 name: release
 
-# Build and publish a GitHub Release whenever a version tag is pushed.
-#   git tag v1.2.0 && git push origin v1.2.0
 on:
   push:
     tags:
       - "v*.*"
 
 permissions:
-  contents: write # needed to create the release and upload assets
+  contents: write
 
 jobs:
-  build:
-    name: Build ${{ matrix.arch }}
+  linux:
+    name: Linux ${{ matrix.arch }}
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -23,41 +21,27 @@ jobs:
             runner: ubuntu-latest
           - arch: aarch64
             target: aarch64-unknown-linux-musl
-            # Native ARM runner rather than a cross toolchain: musl-tools then
-            # provides a matching musl-gcc and nothing has to be cross-linked.
             runner: ubuntu-24.04-arm
     env:
       TARGET: ${{ matrix.target }}
     steps:
       - uses: actions/checkout@v4
-
-      # Static musl build so the binaries run anywhere (incl. NixOS) with no
-      # glibc dependency. reqwest uses rustls, so no OpenSSL is needed.
-      - name: Install Rust (musl target)
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-
       - name: Install musl tools
         run: sudo apt-get update && sudo apt-get install -y musl-tools
-
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}
-
       - name: Build
-        run: cargo build --release --locked --target "$TARGET" -p m365-tui -p webhook
-
-      # The realtime bundle wraps this binary in Alpine, which can only run it if
-      # it's genuinely static. A dynamically-linked build would pass CI here and
-      # then fail inside the container with an unhelpful "not found". Note a Rust
-      # musl release is "static-pie linked", not "statically linked", so this
-      # tests for the absence of the dynamic marker rather than a static one.
-      - name: Verify the binaries are static
+        run: cargo build --release --locked --target "$TARGET" -p ask-ark -p webhook
+      - name: Verify static binaries
         run: |
           set -euo pipefail
-          for bin in m365 m365-webhook; do
+          for bin in ark m365-webhook; do
             desc=$(file -b "target/$TARGET/release/$bin")
             echo "$bin: $desc"
             case "$desc" in
@@ -65,64 +49,95 @@ jobs:
                 echo "::error::$bin is dynamically linked"; exit 1 ;;
             esac
           done
-
-      # ONE asset per architecture. An earlier version published the app and the
-      # optional push stack separately, which meant the releases page offered two
-      # similarly-named tarballs with no way to tell which one was the program —
-      # and the wrong guess produced a download containing no `m365` at all.
-      # Everything ships together instead; the push stack is a subdirectory you
-      # only enter if you want it.
       - name: Package
         run: |
           set -euo pipefail
-          # The extracted directory carries the version, but the asset name is
-          # kept stable so /releases/latest/download/<asset> always resolves —
-          # that's what the README's install one-liner relies on.
-          dir="m365-tui-${GITHUB_REF_NAME}"
-          asset="m365-tui-${{ matrix.arch }}-linux-musl.tar.gz"
+          dir="ask-ark-${GITHUB_REF_NAME}"
+          asset="ask-ark-${{ matrix.arch }}-linux-musl.tar.gz"
           mkdir -p "dist/$dir/realtime"
-
-          cp "target/$TARGET/release/m365" "dist/$dir/"
+          cp "target/$TARGET/release/ark" "dist/$dir/"
           cp "target/$TARGET/release/m365-webhook" "dist/$dir/"
-          cp README.md ARCHITECTURE.md LICENSE "dist/$dir/"
-
+          cp README.md ARCHITECTURE.md LICENSE .env.example "dist/$dir/"
           cp deploy/docker-compose.yml deploy/Dockerfile deploy/.env.example \
              deploy/README.md deploy/up.sh deploy/down.sh "dist/$dir/realtime/"
-          # A second copy of the webhook, so `docker build` inside realtime/ has a
-          # self-contained context and its Dockerfile stays a plain COPY.
           cp "target/$TARGET/release/m365-webhook" "dist/$dir/realtime/"
-          chmod +x "dist/$dir/realtime/up.sh" "dist/$dir/realtime/down.sh" \
-                   "dist/$dir/realtime/m365-webhook"
-
+          chmod +x "dist/$dir/ark" "dist/$dir/realtime/up.sh" \
+                   "dist/$dir/realtime/down.sh" "dist/$dir/realtime/m365-webhook"
           tar -C dist -czf "$asset" "$dir"
           sha256sum "$asset" > "$asset.sha256"
-
-      - name: Upload for the publish job
+      - name: Upload assets
         uses: actions/upload-artifact@v4
         with:
-          name: assets-${{ matrix.arch }}
+          name: assets-linux-${{ matrix.arch }}
           path: |
             *.tar.gz
             *.tar.gz.sha256
           if-no-files-found: error
 
+  windows:
+    name: Windows ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            target: x86_64-pc-windows-msvc
+            runner: windows-latest
+          - arch: aarch64
+            target: aarch64-pc-windows-msvc
+            runner: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - name: Build
+        shell: pwsh
+        run: cargo build --release --locked --target "${{ matrix.target }}" -p ask-ark
+      - name: Package
+        shell: pwsh
+        run: |
+          $dir = "ask-ark-$env:GITHUB_REF_NAME"
+          $asset = "ask-ark-${{ matrix.arch }}-windows.zip"
+          New-Item -ItemType Directory -Force -Path "dist/$dir" | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/ark.exe" "dist/$dir/"
+          Copy-Item README.md, ARCHITECTURE.md, LICENSE, .env.example "dist/$dir/"
+          Compress-Archive -Path "dist/$dir" -DestinationPath $asset
+          $hash = (Get-FileHash -Algorithm SHA256 $asset).Hash.ToLower()
+          "$hash  $asset" | Set-Content -NoNewline "$asset.sha256"
+      - name: Upload assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-windows-${{ matrix.arch }}
+          path: |
+            *.zip
+            *.zip.sha256
+          if-no-files-found: error
+
   publish:
     name: Publish release
-    needs: build
+    needs: [linux, windows]
     runs-on: ubuntu-latest
     steps:
-      - name: Collect every architecture's assets
+      - name: Collect assets
         uses: actions/download-artifact@v4
         with:
           pattern: assets-*
           merge-multiple: true
           path: dist
-
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/*.tar.gz
             dist/*.tar.gz.sha256
+            dist/*.zip
+            dist/*.zip.sha256
           generate_release_notes: true
           fail_on_unmatched_files: true

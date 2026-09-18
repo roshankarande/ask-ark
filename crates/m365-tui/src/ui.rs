@@ -687,7 +687,7 @@ fn render_overlay(f: &mut Frame, app: &App, overlay: &Overlay) {
             let area = centered(60, 60, f.area());
             f.render_widget(Clear, area);
             let text = "\
- M365 TUI — keys\n\
+ Ask Ark — keys\n\
  \n\
  Global:  F2 switch app · Ctrl+P palette · p set presence · ? help · q quit\n\
  \n\

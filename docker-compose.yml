@@ -1,4 +1,4 @@
-# Real-time infrastructure for the M365 TUI.
+# Real-time infrastructure for Ask Ark.
 #
 #   redis       message bus between the webhook and the TUI (TUI runs on the host)
 #   webhook     receives Graph change notifications, publishes them to Redis
@@ -21,7 +21,7 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     command: ["redis-server", "--save", "", "--appendonly", "no"]
-    container_name: m365-tui-redis
+    container_name: ask-ark-redis
     ports:
       - "127.0.0.1:6379:6379"   # host access for the TUI
 
@@ -35,7 +35,7 @@ services:
       M365_CLIENT_STATE: "${M365_CLIENT_STATE}"
       WEBHOOK_BIND: "0.0.0.0:8080"
       RUST_LOG: "info"
-    container_name: m365-tui-webhook
+    container_name: ask-ark-webhook
     env_file:
       - .env
     ports:
@@ -54,7 +54,7 @@ services:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
-    container_name: m365-tui-tunnel
+    container_name: ask-ark-tunnel
     env_file:
       - .env
     depends_on:

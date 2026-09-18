@@ -1,5 +1,5 @@
 #!/bin/sh
-# Stop the m365-tui real-time stack and remove its containers.
+# Stop the ask-ark real-time stack and remove its containers.
 #
 #   ./down.sh            stop everything
 #   ./down.sh --volumes  also drop the Redis volume (there's nothing in it worth
